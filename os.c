@@ -23,9 +23,18 @@ struct tcb{
 
 };
 typedef struct tcb tcbType;
+
+struct pet{            // Periodic Event Thread  
+  void(*event)(void); // pointer to event
+  uint32_t period;     // Period of occurence of the thread
+};
+typedef struct pet petType;
+
 tcbType tcbs[NUMTHREADS];
 tcbType *RunPt;
 int32_t Stacks[NUMTHREADS][STACKSIZE];
+
+petType pets[NUMPERIODIC];
 
 
 // ******** OS_Init ************
@@ -38,6 +47,7 @@ void OS_Init(void){
   DisableInterrupts();
   BSP_Clock_InitFastest();// set processor clock to fastest speed
   // perform any initializations needed
+	BSP_PeriodicTask_Init(&runperiodicevents, 1000, 2);
 }
 
 void SetInitialStack(int i){
@@ -117,20 +127,41 @@ int OS_AddThreads(void(*thread0)(void),
 // These threads cannot spin, block, loop, sleep, or kill
 // These threads can call OS_Signal
 // In Lab 3 this will be called exactly twice
-void(*event1)(void);
-uint32_t event1Period;
 
+uint32_t petCount = 0;
 int OS_AddPeriodicEventThread(void(*thread)(void), uint32_t period){
-
-	event1Period = period;
-  event1 = thread;
+	
+	if (petCount < NUMPERIODIC){
+		pets[petCount].event = thread;
+		pets[petCount].period = period;
+    petCount++; 		
+	}
+	else {
+		return 0; // Too many periodic event threads
+	}
 	
   return 1;
-
 }
 
+static uint32_t msCount = 0; 
 void static runperiodicevents(void){
 // **RUN PERIODIC THREADS, DECREMENT SLEEP COUNTERS
+	for(int i = 0; i < NUMTHREADS; i++) {
+		 if (tcbs[i].sleep) {
+				tcbs[i].sleep--;
+		 }
+	}
+	
+	//Find the maximum period between 2 periodic event threads
+	int maxPeriod = (pets[0].period > pets[1].period) ? pets[0].period : pets[1].period; 
+
+	for(int i = 0; i < NUMPERIODIC; i++)  {
+		if (msCount % pets[i].period == i){
+			(*(pets[i].event))(); 
+		}
+  }
+	
+	msCount = (msCount + 1) % maxPeriod; 
 
 }
 
@@ -275,4 +306,5 @@ uint32_t OS_FIFO_Get(void){uint32_t data;
 	GetI = (GetI+1)%FSIZE; // place to get next
   return data;
 }
+
 

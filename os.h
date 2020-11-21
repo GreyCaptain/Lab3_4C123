@@ -28,6 +28,8 @@
 #ifndef __OS_H
 #define __OS_H  1
 
+void static runperiodicevents(void);
+
 
 // ******** OS_Init ************
 // Initialize operating system, disable interrupts
